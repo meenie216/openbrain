@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BASE_URL="${OPENBRAIN_CAPTURE_URL:-http://localhost:8080}"
+
+if [ $# -gt 0 ]; then
+    text="$*"
+else
+    text="$(cat)"
+fi
+
+if [ -z "$text" ]; then
+    echo "Usage: brain-capture \"some thought\"  (or pipe text via stdin)" >&2
+    exit 1
+fi
+
+payload=$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1], "source": "cli"}))' "$text")
+
+curl -sf -X POST "$BASE_URL/capture" \
+    -H "Content-Type: application/json" \
+    -d "$payload" | python3 -m json.tool
