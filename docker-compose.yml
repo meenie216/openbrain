@@ -1,12 +1,13 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "${BIND_ADDR:-127.0.0.1}:${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d
@@ -16,13 +17,24 @@ services:
       timeout: 5s
       retries: 10
 
+  # Only started when COMPOSE_PROFILES includes "ollama". Hosts that already
+  # run an Ollama reachable from containers point OLLAMA_BASE_URL at that;
+  # hosts using this service set OLLAMA_BASE_URL=http://ollama:11434.
+  ollama:
+    image: ollama/ollama:latest
+    profiles: [ollama]
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+
   capture-api:
     build:
       context: .
       dockerfile: capture/Dockerfile
+    restart: unless-stopped
     env_file: .env
     ports:
-      - "${CAPTURE_API_PORT}:8080"
+      - "${BIND_ADDR:-127.0.0.1}:${CAPTURE_API_PORT}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,9 +45,10 @@ services:
     build:
       context: .
       dockerfile: mcp/Dockerfile
+    restart: unless-stopped
     env_file: .env
     ports:
-      - "${MCP_SERVER_PORT}:8765"
+      - "${BIND_ADDR:-127.0.0.1}:${MCP_SERVER_PORT}:8765"
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,3 +57,4 @@ services:
 
 volumes:
   postgres_data:
+  ollama_data:
