@@ -14,7 +14,18 @@ EXTRACTION_TOOL = {
                 "type": "string",
                 "enum": ["decision", "person_note", "insight", "meeting_debrief", "task", "other"],
             },
-            "people": {"type": "array", "items": {"type": "string"}},
+            "people": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Other people or teams the thought is about or refers to — "
+                    "never the person capturing the thought themselves. Exclude "
+                    "self-references (e.g. 'I', 'me', 'my', 'the user', or the "
+                    "author's own name if it appears) entirely; do not normalize "
+                    "them to a placeholder like 'user' or 'unknown' either. Only "
+                    "list third parties: named individuals, teams, or roles."
+                ),
+            },
             "topics": {"type": "array", "items": {"type": "string"}},
             "action_items": {"type": "array", "items": {"type": "string"}},
         },

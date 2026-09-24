@@ -1,3 +1,4 @@
+import json
 import os
 
 import asyncpg
@@ -47,6 +48,23 @@ async def list_recent(limit: int) -> list[dict]:
         limit,
     )
     return [dict(r) for r in rows]
+
+
+async def insert_thought(raw_text: str, embedding: list[float], metadata: dict, source: str) -> dict:
+    pool = await get_pool()
+    embedding_literal = "[" + ",".join(str(x) for x in embedding) + "]"
+    row = await pool.fetchrow(
+        """
+        INSERT INTO thoughts (raw_text, embedding, metadata, source)
+        VALUES ($1, $2::vector, $3::jsonb, $4)
+        RETURNING id, raw_text, metadata, source, created_at
+        """,
+        raw_text,
+        embedding_literal,
+        json.dumps(metadata),
+        source,
+    )
+    return dict(row)
 
 
 async def stats() -> dict:

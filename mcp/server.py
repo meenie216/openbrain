@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 
@@ -5,6 +6,7 @@ from mcp.server.mcpserver import MCPServer
 
 import db
 from common.embeddings import embed
+from capture.app.metadata import extract_metadata
 
 server = MCPServer("openbrain")
 
@@ -36,6 +38,17 @@ async def list_recent(limit: int = 10) -> list[dict]:
 async def stats() -> dict:
     """Summary stats: counts by type, top people/topics, captures per day this week."""
     return await db.stats()
+
+
+@server.tool()
+async def capture(text: str, source: str = "mcp") -> dict:
+    """Capture a thought with automatic metadata extraction and embedding."""
+    embedding, metadata = await asyncio.gather(
+        embed(text),
+        extract_metadata(text),
+    )
+    thought = await db.insert_thought(text, embedding, metadata, source)
+    return _format_row(thought)
 
 
 if __name__ == "__main__":
