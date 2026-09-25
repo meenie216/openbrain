@@ -62,3 +62,18 @@ pre-seeded), so nothing in `db/migrations/` needs applying. An existing
 database is brought up to date by applying `db/migrations/*.sql` in order.
 Each migration is wrapped in a transaction, is safe to re-run, and records
 itself in `schema_migrations`.
+
+## Authentication
+
+Two static bearer tokens, `OPENBRAIN_READ_TOKEN` and `OPENBRAIN_WRITE_TOKEN`
+(generate with `openssl rand -hex 32`). Write also grants read. Both servers
+refuse to start if either is unset, and `/health` stays open. Tokens are
+never logged.
+
+Deliberately not OAuth: this is a single-user system, so two long-lived
+tokens are enough. Services bind to `127.0.0.1` by default; reach them from
+other machines over a private network or VPN rather than exposing them
+publicly.
+
+To rotate, generate a new token, update `.env` and the clients, then run
+`docker compose up -d`.

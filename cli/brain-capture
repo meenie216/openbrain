@@ -3,6 +3,11 @@ set -euo pipefail
 
 BASE_URL="${OPENBRAIN_CAPTURE_URL:-http://localhost:8080}"
 
+if [ -z "${OPENBRAIN_TOKEN:-}" ]; then
+    echo "OPENBRAIN_TOKEN is not set (need the write token) — see .env / ~/.bashrc" >&2
+    exit 1
+fi
+
 if [ $# -gt 0 ]; then
     text="$*"
 else
@@ -18,4 +23,5 @@ payload=$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1], "s
 
 curl -sf -X POST "$BASE_URL/capture" \
     -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $OPENBRAIN_TOKEN" \
     -d "$payload" | python3 -m json.tool

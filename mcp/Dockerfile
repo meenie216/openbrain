@@ -6,7 +6,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY common ./common
 COPY capture ./capture
-COPY mcp/db.py mcp/server.py ./
+COPY mcp/db.py mcp/server.py mcp/auth_middleware.py ./
 
 ENV PYTHONPATH=/app
 
