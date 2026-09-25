@@ -77,3 +77,11 @@ publicly.
 
 To rotate, generate a new token, update `.env` and the clients, then run
 `docker compose up -d`.
+
+## Deploying
+
+`DEPLOY_TARGET=user@host:path/ cli/deploy.sh` rsyncs the code to another
+machine. It deliberately never syncs `.env`: that file mixes host-specific
+values (`OLLAMA_BASE_URL`, `COMPOSE_PROFILES`) with values that should be
+shared (API keys, tokens), and a wholesale copy overwrites the former. Edit
+`.env` on the target by hand when a new variable is added.
