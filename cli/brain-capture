@@ -2,6 +2,7 @@
 set -euo pipefail
 
 BASE_URL="${OPENBRAIN_CAPTURE_URL:-http://localhost:8080}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ -z "${OPENBRAIN_TOKEN:-}" ]; then
     echo "OPENBRAIN_TOKEN is not set (need the write token) — see .env / ~/.bashrc" >&2
@@ -19,9 +20,17 @@ if [ -z "$text" ]; then
     exit 1
 fi
 
-payload=$(python3 -c 'import json,sys; print(json.dumps({"text": sys.argv[1], "source": "cli"}))' "$text")
+# Auto-scope to the current directory's project (git remote, or a path
+# fallback), same logic the SessionStart hook uses to load rules back —
+# see cli/scope.sh. Empty means global, same as leaving scope unset.
+scope="$("$SCRIPT_DIR/scope.sh")"
+if [ -n "$scope" ]; then
+    payload=$(jq -n --arg text "$text" --arg scope "$scope" '{text: $text, source: "cli", scope: $scope}')
+else
+    payload=$(jq -n --arg text "$text" '{text: $text, source: "cli"}')
+fi
 
 curl -sf -X POST "$BASE_URL/capture" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $OPENBRAIN_TOKEN" \
-    -d "$payload" | python3 -m json.tool
+    -d "$payload" | jq .

@@ -100,3 +100,28 @@ and `kind`); they are never inferred from the text. `semantic_search` and
 searches everything. `get_rules(scope)` (MCP) and `GET /rules?scope=` (HTTP,
 read token, plain markdown) return every rule that is global or matches the
 scope, global first.
+
+## Project key and the SessionStart hook
+
+`cli/scope.sh [DIR]` prints the project key for a directory: the git `origin`
+URL normalised to `owner/repo` (worktrees share their clone's key), else a
+`~`-relative or absolute path, else nothing for `$HOME` or `/tmp` themselves
+(global). `cli/brain-capture` uses it to scope what it captures.
+
+`cli/session-rules.sh` is a Claude Code `SessionStart` hook: it reads `cwd`
+from the hook's JSON on stdin, resolves the scope, fetches `GET /rules` and
+prints the markdown, which Claude Code adds to the session's context. It
+fails open: if the service is down or the token is missing or rejected it
+prints one warning line on stderr and exits 0, so a session is never blocked.
+
+- Read token: `~/.config/openbrain/read-token` (mode 600), or the file named
+  by `OPENBRAIN_READ_TOKEN_FILE`.
+- Server URL: `OPENBRAIN_CAPTURE_URL`, else the `export
+  OPENBRAIN_CAPTURE_URL=...` line in `~/.config/openbrain/env`, else
+  `http://localhost:8080`.
+
+```json
+{ "hooks": { "SessionStart": [ { "hooks": [
+  { "type": "command", "command": "/path/to/openbrain/cli/session-rules.sh" }
+] } ] } }
+```
