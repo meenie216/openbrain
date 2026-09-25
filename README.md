@@ -85,3 +85,18 @@ machine. It deliberately never syncs `.env`: that file mixes host-specific
 values (`OLLAMA_BASE_URL`, `COMPOSE_PROFILES`) with values that should be
 shared (API keys, tokens), and a wholesale copy overwrites the former. Edit
 `.env` on the target by hand when a new variable is added.
+
+## Scopes and rules
+
+Every thought has a `scope` (a project key, `NULL` = global) and a `kind`:
+
+- `thought`: found via `semantic_search` when relevant.
+- `rule`: a durable "always/never do X" preference, loaded into every session
+  at start rather than searched for.
+
+The caller chooses both explicitly on capture (`POST /capture` takes `scope`
+and `kind`); they are never inferred from the text. `semantic_search` and
+`list_recent` take an optional `scope` plus `include_global`; omitting `scope`
+searches everything. `get_rules(scope)` (MCP) and `GET /rules?scope=` (HTTP,
+read token, plain markdown) return every rule that is global or matches the
+scope, global first.

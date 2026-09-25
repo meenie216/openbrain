@@ -23,36 +23,52 @@ def _format_row(row: dict) -> dict:
 
 
 @server.tool()
-async def semantic_search(query: str, limit: int = 5) -> list[dict]:
-    """Search captured thoughts by meaning, not keyword."""
+async def semantic_search(
+    query: str, limit: int = 5, scope: str | None = None, include_global: bool = True
+) -> list[dict]:
+    """Search captured thoughts by meaning, not keyword.
+
+    scope: restrict to a project key (plus global thoughts, unless
+    include_global=False). Omit to search everything, the default.
+    """
     query_embedding = await embed(query)
-    rows = await db.semantic_search(query_embedding, limit)
+    rows = await db.semantic_search(query_embedding, limit, scope, include_global)
     return [_format_row(r) for r in rows]
 
 
 @server.tool()
-async def list_recent(limit: int = 10) -> list[dict]:
-    """List the most recently captured thoughts."""
-    rows = await db.list_recent(limit)
+async def list_recent(limit: int = 10, scope: str | None = None, include_global: bool = True) -> list[dict]:
+    """List the most recently captured thoughts. Same scope/include_global as semantic_search."""
+    rows = await db.list_recent(limit, scope, include_global)
     return [_format_row(r) for r in rows]
 
 
 @server.tool()
-async def stats() -> dict:
-    """Summary stats: counts by type, top people/topics, captures per day this week."""
-    return await db.stats()
+async def get_rules(scope: str | None = None) -> list[dict]:
+    """Standing rules to load at session start: global rules, plus this
+    scope's project rules if given. Unlike thoughts, rules aren't meant to
+    be found by search — they're meant to already be in context."""
+    rows = await db.get_rules(scope)
+    return [_format_row(r) for r in rows]
 
 
 @server.tool()
-async def capture(text: str, source: str = "mcp") -> dict:
-    """Capture a thought with automatic metadata extraction and embedding."""
+async def capture(text: str, source: str = "mcp", scope: str | None = None, kind: str = "thought") -> dict:
+    """Capture a thought, or a standing 'rule' (kind='rule') to be loaded
+    into every future session instead of found by search.
+
+    scope: None for global (applies everywhere); otherwise a project key
+    (e.g. an owner/repo). The caller decides both — never inferred.
+    """
     if mcp_access_level.get() != "write":
         raise ToolError("This token is read-only; capture requires the write token.")
+    if kind not in ("rule", "thought"):
+        raise ToolError(f"kind must be 'rule' or 'thought', got {kind!r}")
     embedding, metadata = await asyncio.gather(
         embed(text),
         extract_metadata(text),
     )
-    thought = await db.insert_thought(text, embedding, metadata, source)
+    thought = await db.insert_thought(text, embedding, metadata, source, scope, kind)
     return _format_row(thought)
 
 

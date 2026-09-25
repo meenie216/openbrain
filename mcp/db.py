@@ -19,50 +19,89 @@ async def get_pool() -> asyncpg.Pool:
     return _pool
 
 
-async def semantic_search(embedding: list[float], limit: int) -> list[dict]:
+async def semantic_search(
+    embedding: list[float], limit: int, scope: str | None = None, include_global: bool = True
+) -> list[dict]:
+    """scope=None searches everything (the pre-scope behaviour). scope=X
+    restricts to that project plus global (scope IS NULL) rows, unless
+    include_global is False."""
     pool = await get_pool()
     embedding_literal = "[" + ",".join(str(x) for x in embedding) + "]"
     rows = await pool.fetch(
         """
-        SELECT id, raw_text, metadata, source, created_at,
+        SELECT id, raw_text, metadata, source, scope, kind, created_at,
                1 - (embedding <=> $1::vector) AS similarity
         FROM thoughts
+        WHERE $3::text IS NULL OR scope = $3 OR ($4 AND scope IS NULL)
         ORDER BY embedding <=> $1::vector
         LIMIT $2
         """,
         embedding_literal,
         limit,
+        scope,
+        include_global,
     )
     return [dict(r) for r in rows]
 
 
-async def list_recent(limit: int) -> list[dict]:
+async def list_recent(limit: int, scope: str | None = None, include_global: bool = True) -> list[dict]:
     pool = await get_pool()
     rows = await pool.fetch(
         """
-        SELECT id, raw_text, metadata, source, created_at
+        SELECT id, raw_text, metadata, source, scope, kind, created_at
         FROM thoughts
+        WHERE $2::text IS NULL OR scope = $2 OR ($3 AND scope IS NULL)
         ORDER BY created_at DESC
         LIMIT $1
         """,
         limit,
+        scope,
+        include_global,
     )
     return [dict(r) for r in rows]
 
 
-async def insert_thought(raw_text: str, embedding: list[float], metadata: dict, source: str) -> dict:
+async def get_rules(scope: str | None = None) -> list[dict]:
+    """Standing rules: global (scope IS NULL) plus this scope's, if given.
+
+    Global rules first, then project rules, each group newest-last so a
+    later rule (added to override an earlier one) reads as the final word.
+    """
+    pool = await get_pool()
+    rows = await pool.fetch(
+        """
+        SELECT id, raw_text, metadata, source, scope, kind, created_at
+        FROM thoughts
+        WHERE kind = 'rule' AND (scope IS NULL OR scope = $1::text)
+        ORDER BY (scope IS NOT NULL), created_at ASC
+        """,
+        scope,
+    )
+    return [dict(r) for r in rows]
+
+
+async def insert_thought(
+    raw_text: str,
+    embedding: list[float],
+    metadata: dict,
+    source: str,
+    scope: str | None = None,
+    kind: str = "thought",
+) -> dict:
     pool = await get_pool()
     embedding_literal = "[" + ",".join(str(x) for x in embedding) + "]"
     row = await pool.fetchrow(
         """
-        INSERT INTO thoughts (raw_text, embedding, metadata, source)
-        VALUES ($1, $2::vector, $3::jsonb, $4)
-        RETURNING id, raw_text, metadata, source, created_at
+        INSERT INTO thoughts (raw_text, embedding, metadata, source, scope, kind)
+        VALUES ($1, $2::vector, $3::jsonb, $4, $5, $6)
+        RETURNING id, raw_text, metadata, source, scope, kind, created_at
         """,
         raw_text,
         embedding_literal,
         json.dumps(metadata),
         source,
+        scope,
+        kind,
     )
     return dict(row)
 
