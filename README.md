@@ -54,3 +54,11 @@ cp .env.example .env     # fill in the API key and passwords
 docker compose up -d
 cli/brain-capture "a thought worth keeping"
 ```
+
+## Schema and migrations
+
+A fresh install gets the full schema from `db/init/` (and `schema_migrations`
+pre-seeded), so nothing in `db/migrations/` needs applying. An existing
+database is brought up to date by applying `db/migrations/*.sql` in order.
+Each migration is wrapped in a transaction, is safe to re-run, and records
+itself in `schema_migrations`.
