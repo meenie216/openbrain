@@ -101,6 +101,12 @@ searches everything. `get_rules(scope)` (MCP) and `GET /rules?scope=` (HTTP,
 read token, plain markdown) return every rule that is global or matches the
 scope, global first.
 
+Memories can be corrected after the fact (MCP, write token): `forget(id)`
+permanently deletes one, and `update_thought(id, text?, scope?, kind?)` edits
+it in place — new text is re-embedded and re-classified, `scope=""` makes it
+global, and omitted fields are untouched. Ids come from `semantic_search`,
+`list_recent` and `get_rules`.
+
 ## Project key and the SessionStart hook
 
 `cli/scope.sh [DIR]` prints the project key for a directory: the git `origin`

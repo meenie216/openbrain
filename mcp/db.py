@@ -106,6 +106,49 @@ async def insert_thought(
     return dict(row)
 
 
+async def delete_thought(thought_id: str) -> bool:
+    pool = await get_pool()
+    result = await pool.execute("DELETE FROM thoughts WHERE id = $1::uuid", thought_id)
+    return result == "DELETE 1"
+
+
+async def update_thought(
+    thought_id: str,
+    *,
+    raw_text: str | None = None,
+    embedding: list[float] | None = None,
+    metadata: dict | None = None,
+    scope: str | None = None,
+    set_scope: bool = False,
+    kind: str | None = None,
+) -> dict | None:
+    """Update only the fields given. scope needs set_scope because None is a
+    real value (global). Text, embedding and metadata change together — the
+    caller re-derives the latter two when the text changes."""
+    pool = await get_pool()
+    embedding_literal = None if embedding is None else "[" + ",".join(str(x) for x in embedding) + "]"
+    row = await pool.fetchrow(
+        """
+        UPDATE thoughts SET
+            raw_text  = COALESCE($2, raw_text),
+            embedding = COALESCE($3::vector, embedding),
+            metadata  = COALESCE($4::jsonb, metadata),
+            scope     = CASE WHEN $5 THEN $6 ELSE scope END,
+            kind      = COALESCE($7, kind)
+        WHERE id = $1::uuid
+        RETURNING id, raw_text, metadata, source, scope, kind, created_at
+        """,
+        thought_id,
+        raw_text,
+        embedding_literal,
+        None if metadata is None else json.dumps(metadata),
+        set_scope,
+        scope,
+        kind,
+    )
+    return None if row is None else dict(row)
+
+
 async def stats() -> dict:
     pool = await get_pool()
     total = await pool.fetchval("SELECT count(*) FROM thoughts")
