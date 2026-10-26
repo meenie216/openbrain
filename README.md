@@ -112,7 +112,7 @@ scopes: global first, then the scopes in the order given.
 
 Memories can be corrected after the fact (MCP, write token): `forget(id)`
 permanently deletes one, and `update_thought(id, text?, scope?, kind?)` edits
-it in place — new text is re-embedded and re-classified, `scope=""` makes it
+it in place — new text is re-embedded and re-classified, `scope="global"` makes it
 global, and omitted fields are untouched. Ids come from `semantic_search`,
 `list_recent` and `get_rules`.
 

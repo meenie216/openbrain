@@ -108,7 +108,8 @@ async def update_thought(
     Only the fields you pass change.
 
     text: replacement text (re-embedded and re-classified).
-    scope: new project key; pass "" to make it global. Omit to leave unchanged.
+    scope: new group or project key; pass "global" (or "") to make it global.
+    Omit to leave unchanged.
     kind: 'rule' or 'thought'. Omit to leave unchanged.
     """
     _require_write()
@@ -125,7 +126,7 @@ async def update_thought(
         raw_text=text,
         embedding=embedding,
         metadata=metadata,
-        scope=scope or None,
+        scope=None if scope in ("", "global") else scope,
         set_scope=scope is not None,
         kind=kind,
     )
