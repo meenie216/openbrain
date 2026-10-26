@@ -88,7 +88,15 @@ shared (API keys, tokens), and a wholesale copy overwrites the former. Edit
 
 ## Scopes and rules
 
-Every thought has a `scope` (a project key, `NULL` = global) and a `kind`:
+Every thought has a `scope` and a `kind`. A scope is one of three layers:
+global (`NULL`, applies everywhere), a **group** (`cm`, `personal`: applies to
+every project under that group's directories), or a **project** key. A session
+loads all the layers that apply, general to specific, so the most specific
+rule reads as the final word. Choose the broadest layer the memory is still
+true and useful in; when unsure, go one narrower, since `update_thought` can
+widen it later.
+
+`kind`:
 
 - `thought`: found via `semantic_search` when relevant.
 - `rule`: a durable "always/never do X" preference, loaded into every session
@@ -96,10 +104,11 @@ Every thought has a `scope` (a project key, `NULL` = global) and a `kind`:
 
 The caller chooses both explicitly on capture (`POST /capture` takes `scope`
 and `kind`); they are never inferred from the text. `semantic_search` and
-`list_recent` take an optional `scope` plus `include_global`; omitting `scope`
-searches everything. `get_rules(scope)` (MCP) and `GET /rules?scope=` (HTTP,
-read token, plain markdown) return every rule that is global or matches the
-scope, global first.
+`list_recent` take an optional `scopes` list plus `include_global`; omitting
+`scopes` searches everything. `get_rules(scopes)` (MCP) and
+`GET /rules?scope=cm&scope=owner/repo` (HTTP, read token, plain markdown,
+`scope` repeatable) return every rule that is global or in one of the given
+scopes: global first, then the scopes in the order given.
 
 Memories can be corrected after the fact (MCP, write token): `forget(id)`
 permanently deletes one, and `update_thought(id, text?, scope?, kind?)` edits
@@ -107,15 +116,28 @@ it in place — new text is re-embedded and re-classified, `scope=""` makes it
 global, and omitted fields are untouched. Ids come from `semantic_search`,
 `list_recent` and `get_rules`.
 
-## Project key and the SessionStart hook
+## Scope resolution and the SessionStart hook
 
 `cli/scope.sh [DIR]` prints the project key for a directory: the git `origin`
 URL normalised to `owner/repo` (worktrees share their clone's key), else a
 `~`-relative or absolute path, else nothing for `$HOME` or `/tmp` themselves
-(global). `cli/brain-capture` uses it to scope what it captures.
+(global). `scope.sh --layers [DIR]` prints every scope that applies, one per
+line, general to specific: the group, then the project.
+
+Groups come from `~/.config/openbrain/groups` (or `OPENBRAIN_GROUPS_FILE`),
+one `<path> <group>` per line, so nothing about your directories or employer
+lives in the repo:
+
+```
+~/dev.cm        cm
+~/dev.personal  personal
+```
+
+`cli/brain-capture` scopes to the project by default; `--scope cm` saves at
+a group (or any explicit scope) and `--global` saves globally.
 
 `cli/session-rules.sh` is a Claude Code `SessionStart` hook: it reads `cwd`
-from the hook's JSON on stdin, resolves the scope, fetches `GET /rules` and
+from the hook's JSON on stdin, resolves the scope layers, fetches `GET /rules` and
 prints the markdown, which Claude Code adds to the session's context. It
 fails open: if the service is down or the token is missing or rejected it
 prints one warning line on stderr and exits 0, so a session is never blocked.

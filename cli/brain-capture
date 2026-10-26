@@ -9,6 +9,17 @@ if [ -z "${OPENBRAIN_TOKEN:-}" ]; then
     exit 1
 fi
 
+# --scope NAME saves at an explicit scope (e.g. a group like "cm" or
+# "personal") instead of this directory's project; --global saves globally.
+scope_override=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --scope) scope_override="${2:?--scope needs a value}"; shift 2 ;;
+        --global) scope_override="-"; shift ;;
+        *) break ;;
+    esac
+done
+
 if [ $# -gt 0 ]; then
     text="$*"
 else
@@ -23,7 +34,11 @@ fi
 # Auto-scope to the current directory's project (git remote, or a path
 # fallback), same logic the SessionStart hook uses to load rules back —
 # see cli/scope.sh. Empty means global, same as leaving scope unset.
-scope="$("$SCRIPT_DIR/scope.sh")"
+case "$scope_override" in
+    "") scope="$("$SCRIPT_DIR/scope.sh")" ;;
+    -) scope="" ;;
+    *) scope="$scope_override" ;;
+esac
 if [ -n "$scope" ]; then
     payload=$(jq -n --arg text "$text" --arg scope "$scope" '{text: $text, source: "cli", scope: $scope}')
 else

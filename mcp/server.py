@@ -25,31 +25,33 @@ def _format_row(row: dict) -> dict:
 
 @server.tool()
 async def semantic_search(
-    query: str, limit: int = 5, scope: str | None = None, include_global: bool = True
+    query: str, limit: int = 5, scopes: list[str] | None = None, include_global: bool = True
 ) -> list[dict]:
     """Search captured thoughts by meaning, not keyword.
 
-    scope: restrict to a project key (plus global thoughts, unless
-    include_global=False). Omit to search everything, the default.
+    scopes: restrict to these scopes (a group like "cm", a project key, or
+    both), plus global thoughts unless include_global=False. Omit to search
+    everything, the default.
     """
     query_embedding = await embed(query)
-    rows = await db.semantic_search(query_embedding, limit, scope, include_global)
+    rows = await db.semantic_search(query_embedding, limit, scopes, include_global)
     return [_format_row(r) for r in rows]
 
 
 @server.tool()
-async def list_recent(limit: int = 10, scope: str | None = None, include_global: bool = True) -> list[dict]:
-    """List the most recently captured thoughts. Same scope/include_global as semantic_search."""
-    rows = await db.list_recent(limit, scope, include_global)
+async def list_recent(limit: int = 10, scopes: list[str] | None = None, include_global: bool = True) -> list[dict]:
+    """List the most recently captured thoughts. Same scopes/include_global as semantic_search."""
+    rows = await db.list_recent(limit, scopes, include_global)
     return [_format_row(r) for r in rows]
 
 
 @server.tool()
-async def get_rules(scope: str | None = None) -> list[dict]:
-    """Standing rules to load at session start: global rules, plus this
-    scope's project rules if given. Unlike thoughts, rules aren't meant to
-    be found by search — they're meant to already be in context."""
-    rows = await db.get_rules(scope)
+async def get_rules(scopes: list[str] | None = None) -> list[dict]:
+    """Standing rules to load at session start: global rules, plus those of
+    each given scope (general to specific, e.g. ["cm", "owner/repo"]).
+    Unlike thoughts, rules aren't meant to be found by search — they're
+    meant to already be in context."""
+    rows = await db.get_rules(scopes)
     return [_format_row(r) for r in rows]
 
 
@@ -58,8 +60,9 @@ async def capture(text: str, source: str = "mcp", scope: str | None = None, kind
     """Capture a thought, or a standing 'rule' (kind='rule') to be loaded
     into every future session instead of found by search.
 
-    scope: None for global (applies everywhere); otherwise a project key
-    (e.g. an owner/repo). The caller decides both — never inferred.
+    scope: None for global (applies everywhere); otherwise a group ("cm",
+    "personal") or a project key (e.g. an owner/repo). The caller decides
+    both — never inferred.
     """
     if mcp_access_level.get() != "write":
         raise ToolError("This token is read-only; capture requires the write token.")

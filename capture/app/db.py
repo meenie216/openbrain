@@ -45,20 +45,21 @@ async def insert_thought(
     return dict(row)
 
 
-async def get_rules(scope: str | None = None) -> list[dict]:
-    """Standing rules: global (scope IS NULL) plus this scope's, if given.
+async def get_rules(scopes: list[str] | None = None) -> list[dict]:
+    """Standing rules: global (scope IS NULL) plus those of each given scope.
 
-    Global rules first, then project rules, each group newest-last so a
-    later rule (added to override an earlier one) reads as the final word.
+    Global first, then the scopes in the order given (general to specific),
+    each newest-last so a later rule (added to override an earlier one)
+    reads as the final word.
     """
     pool = await get_pool()
     rows = await pool.fetch(
         """
         SELECT id, raw_text, metadata, source, scope, kind, created_at
         FROM thoughts
-        WHERE kind = 'rule' AND (scope IS NULL OR scope = $1::text)
-        ORDER BY (scope IS NOT NULL), created_at ASC
+        WHERE kind = 'rule' AND (scope IS NULL OR scope = ANY($1::text[]))
+        ORDER BY (scope IS NOT NULL), array_position($1::text[], scope), created_at ASC
         """,
-        scope,
+        scopes or [],
     )
     return [dict(r) for r in rows]

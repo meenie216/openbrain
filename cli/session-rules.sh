@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Claude Code SessionStart hook: prints Open Brain's standing rules
-# (global, plus this directory's project scope if any) as markdown,
+# (global, plus this directory's group and project scopes if any) as markdown,
 # which Claude Code adds to the session's context.
 #
 # Fails open, always exiting 0: an unreachable Open Brain, a missing or
@@ -26,7 +26,7 @@ BASE_URL="${OPENBRAIN_CAPTURE_URL:-http://localhost:8080}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 main() {
-    local token cwd scope url response
+    local token cwd scope url response query
 
     token="$(cat "$TOKEN_FILE" 2>/dev/null)" || return 1
     [ -n "$token" ] || return 1
@@ -37,13 +37,14 @@ main() {
     cwd="$(jq -r '.cwd // empty' 2>/dev/null)" || cwd=""
     [ -n "$cwd" ] || cwd="$PWD"
 
-    scope="$("$SCRIPT_DIR/scope.sh" "$cwd")" || return 1
-
-    if [ -n "$scope" ]; then
-        url="$BASE_URL/rules?scope=$(jq -rn --arg s "$scope" '$s|@uri')" || return 1
-    else
-        url="$BASE_URL/rules"
-    fi
+    # One scope per line (group, then project), general to specific; sent as
+    # repeated scope= params. None means global rules only.
+    query=""
+    while IFS= read -r scope; do
+        [ -n "$scope" ] || continue
+        query="$query&scope=$(jq -rn --arg s "$scope" '$s|@uri')" || return 1
+    done < <("$SCRIPT_DIR/scope.sh" --layers "$cwd")
+    url="$BASE_URL/rules?${query#&}"
 
     response="$(curl -sf --max-time 3 -H "Authorization: Bearer $token" "$url")" || return 1
     printf '%s\n' "$response"

@@ -17,7 +17,7 @@ app = FastAPI()
 class CaptureRequest(BaseModel):
     text: str
     source: str = "http"
-    # None = global (applies everywhere); otherwise a project key. The
+    # None = global (applies everywhere); otherwise a group or project key. The
     # caller decides both explicitly — never inferred from the text.
     scope: str | None = None
     kind: Literal["rule", "thought"] = "thought"
@@ -47,22 +47,22 @@ def _rules_markdown(rows: list[dict]) -> str:
     the (not yet built) SessionStart hook, which can't call an MCP tool."""
     if not rows:
         return "(no standing rules)\n"
-    global_rules = [r for r in rows if r["scope"] is None]
-    project_rules = [r for r in rows if r["scope"] is not None]
+    # Rows arrive global first, then each scope in the order requested;
+    # group them under one heading per scope, keeping that order.
+    by_scope: dict[str | None, list[str]] = {}
+    for r in rows:
+        by_scope.setdefault(r["scope"], []).append(r["raw_text"])
     lines = ["# Standing rules", ""]
-    if global_rules:
-        lines.append("## Global")
-        lines += [f"- {r['raw_text']}" for r in global_rules]
-        lines.append("")
-    if project_rules:
-        lines.append(f"## {project_rules[0]['scope']}")
-        lines += [f"- {r['raw_text']}" for r in project_rules]
+    for scope, texts in by_scope.items():
+        lines.append(f"## {scope or 'Global'}")
+        lines += [f"- {t}" for t in texts]
         lines.append("")
     return "\n".join(lines) + "\n"
 
 
 @app.get("/rules", dependencies=[Depends(require_read)], response_class=PlainTextResponse)
-async def rules(scope: str | None = Query(default=None)):
+async def rules(scope: list[str] = Query(default=[])):
+    """scope may repeat, general to specific: /rules?scope=cm&scope=owner/repo"""
     rows = await db_get_rules(scope)
     return _rules_markdown(rows)
 
